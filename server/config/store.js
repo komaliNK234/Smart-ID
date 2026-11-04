@@ -1,0 +1,331 @@
+// Resilient synchronized store for CampusID
+// Works seamlessly in standalone mode or in tandem with MongoDB
+
+// Names dataset for realistic generation
+const FIRST_NAMES = ['Kotha', 'Aarav', 'Rohan', 'Priya', 'Sai', 'Ananya', 'Karthik', 'Sneha', 'Venkata', 'Divya', 'Rahul', 'Harika', 'Manoj', 'Pooja', 'Suresh', 'Keerthi', 'Teja', 'Lakshmi', 'Nikhil', 'Swathi'];
+const LAST_NAMES = ['Reddy', 'Sharma', 'Verma', 'Sundaram', 'Teja', 'Raju', 'Chowdary', 'Varma', 'Kumar', 'Sri', 'Naidu', 'Rao', 'Goud', 'Patel', 'Yadav'];
+const DEPARTMENTS = [
+  'Computer Science & Engineering',
+  'Electronics & Communication',
+  'Artificial Intelligence & Machine Learning',
+  'Information Technology',
+  'Mechanical Engineering',
+  'Data Science & Analytics',
+];
+
+// Generate 1000 sample students (241FA00001 to 241FA01000)
+export const sample1000Students = Array.from({ length: 1000 }, (_, index) => {
+  const num = index + 1;
+  const seq = String(num).padStart(5, '0');
+  const regNo = `241FA${seq}`;
+  const fName = FIRST_NAMES[index % FIRST_NAMES.length];
+  const lName = LAST_NAMES[(index * 3) % LAST_NAMES.length];
+  const fullName = `${fName} ${lName}`.toUpperCase();
+  const dept = DEPARTMENTS[index % DEPARTMENTS.length];
+  const isHostel = num % 2 === 0; // Even: Hostel, Odd: Day Scholar
+  const status = isHostel ? 'College Hostel' : 'College Bus / Day Scholar';
+
+  return {
+    studentId: regNo,
+    name: fullName,
+    department: dept,
+    course: 'B.TECH',
+    year: 'I Year',
+    section: String((num % 30) + 1),
+    academicYear: '2024 - 2028',
+    dob: '2006-08-15',
+    phone: `98480${String(num).padStart(5, '0')}`,
+    email: `${regNo.toLowerCase()}@vignan.ac.in`,
+    parentName: `${fName} ${LAST_NAMES[(index + 1) % LAST_NAMES.length]} RAO`.toUpperCase(),
+    parentPhone: `98480${String(num).padStart(5, '0')}`,
+    address: `# ${num}, University Enclave, Vadlamudi, Guntur(Dist) - 522213`,
+    photo: isHostel
+      ? 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80'
+      : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    currentStatus: status,
+    previousStatus: status,
+    password: 'student123',
+  };
+});
+
+export const memoryStore = {
+  students: [
+    ...sample1000Students,
+    {
+      studentId: '241FA18059',
+      name: 'KOTHA BHAVYA SREE',
+      department: 'Computer Science & Engineering',
+      course: 'B.TECH ACSE - AI&ML',
+      year: 'I Year',
+      section: '25',
+      academicYear: '2024 - 2028',
+      dob: '2006-08-15',
+      phone: '9618112688',
+      email: '241fa18059@vignan.ac.in',
+      parentName: 'KOTHA BHASKAR RAO',
+      parentPhone: '9618112688',
+      address: '# 2134, Brahmamgari Street, Yerragonda Palem, Prakasam(Dist) - 523327',
+      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      currentStatus: 'College Bus / Day Scholar',
+      previousStatus: 'College Bus / Day Scholar',
+      password: 'student123',
+    },
+    {
+      studentId: '22CS084',
+      name: 'Aarav Sharma',
+      department: 'Computer Science & Engineering',
+      course: 'B.Tech CSE',
+      year: 'III Year',
+      section: 'A',
+      academicYear: '2025 - 2026',
+      dob: '2004-05-14',
+      phone: '+91 98765 43210',
+      email: 'aarav.sharma@campus.edu.in',
+      parentName: 'Ramesh Sharma',
+      parentPhone: '+91 98765 43299',
+      address: '# 42, University Road, Guntur',
+      photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
+      currentStatus: 'College Hostel',
+      previousStatus: 'College Hostel',
+      password: 'student123',
+    },
+    {
+      studentId: '22ME045',
+      name: 'Rohan Verma',
+      department: 'Mechanical Engineering',
+      course: 'B.Tech ME',
+      year: 'III Year',
+      section: 'A',
+      academicYear: '2025 - 2026',
+      dob: '2004-11-03',
+      phone: '+91 97112 34567',
+      email: 'rohan.verma@campus.edu.in',
+      bloodGroup: 'A+',
+      parentName: 'Vikram Verma',
+      parentPhone: '+91 97112 98765',
+      address: '# 12, Green Avenue, Guntur',
+      photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+      currentStatus: 'Outside Hostel / PG',
+      previousStatus: 'College Hostel',
+      password: 'student123',
+    },
+    {
+      studentId: '23EC102',
+      name: 'Priya Sundaram',
+      department: 'Electronics & Communication',
+      course: 'B.Tech ECE',
+      year: 'II Year',
+      section: 'B',
+      academicYear: '2025 - 2026',
+      dob: '2005-08-22',
+      phone: '+91 98450 11223',
+      email: 'priya.sundaram@campus.edu.in',
+      bloodGroup: 'O+',
+      parentName: 'Sundaram Natarajan',
+      parentPhone: '+91 98450 99887',
+      address: '# 88, Lake View, Vijayawada',
+      photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+      currentStatus: 'College Bus / Day Scholar',
+      previousStatus: 'College Bus / Day Scholar',
+      password: 'student123',
+    },
+  ],
+
+  applications: [
+    {
+      applicationId: 'VIGNAN20260001',
+      studentId: '241FA18059',
+      applicationType: 'New ID',
+      mode: 'SMART',
+      idType: 'Day Scholar ID',
+      idOrientation: 'vertical',
+      previousStatus: 'College Bus / Day Scholar',
+      currentStatus: 'College Bus / Day Scholar',
+      documents: [],
+      verificationStatus: 'Not Required',
+      verificationReason: '',
+      feeAmount: 100,
+      processingFee: 0,
+      totalAmount: 100,
+      paymentStatus: 'PAID',
+      transactionId: 'TXN_VIGNAN_001',
+      generated: true,
+      createdAt: new Date('2026-10-30T10:15:00Z'),
+      studentData: {
+        studentId: '241FA18059',
+        name: 'KOTHA BHAVYA SREE',
+        department: 'Computer Science & Engineering',
+        course: 'B.TECH ACSE - AI&ML',
+        year: 'I Year',
+        section: '25',
+        academicYear: '2024 - 2028',
+        dob: '2006-08-15',
+        phone: '9618112688',
+        email: '241fa18059@vignan.ac.in',
+        parentName: 'KOTHA BHASKAR RAO',
+        parentPhone: '9618112688',
+        address: '# 2134, Brahmamgari Street, Yerragonda Palem, Prakasam(Dist) - 523327',
+        photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+        currentStatus: 'College Bus / Day Scholar',
+        previousStatus: 'College Bus / Day Scholar',
+      },
+    },
+    {
+      applicationId: 'IDAPP202610310002',
+      studentId: '22ME045',
+      applicationType: 'Status Change ID',
+      mode: 'SMART',
+      idType: 'Day Scholar ID',
+      idOrientation: 'horizontal',
+      previousStatus: 'College Hostel',
+      currentStatus: 'Outside Hostel / PG',
+      documents: [
+        {
+          documentType: 'Vacated College Hostel Form',
+          fileName: 'Hostel_Vacate_Clearance_22ME045.pdf',
+          fileSize: '1.4 MB',
+          status: 'Uploaded',
+          uploadedAt: new Date('2026-10-31T06:30:00Z'),
+        },
+        {
+          documentType: 'Outside Accommodation Proof',
+          fileName: 'GreenMeadows_PG_Receipt.pdf',
+          fileSize: '890 KB',
+          status: 'Uploaded',
+          uploadedAt: new Date('2026-10-31T06:32:00Z'),
+        },
+      ],
+      verificationStatus: 'Pending Verification',
+      verificationReason: '',
+      feeAmount: 100,
+      processingFee: 10,
+      totalAmount: 110,
+      paymentStatus: 'PENDING',
+      transactionId: null,
+      generated: false,
+      createdAt: new Date('2026-10-31T06:35:00Z'),
+      studentData: {
+        studentId: '22ME045',
+        name: 'Rohan Verma',
+        department: 'Mechanical Engineering',
+        course: 'B.Tech ME',
+        year: 'III Year',
+        section: 'A',
+        academicYear: '2025 - 2026',
+        dob: '2004-11-03',
+        phone: '+91 97112 34567',
+        email: 'rohan.verma@campus.edu.in',
+        bloodGroup: 'A+',
+        parentName: 'Vikram Verma',
+        parentPhone: '+91 97112 98765',
+        photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+        currentStatus: 'Outside Hostel / PG',
+        previousStatus: 'College Hostel',
+      },
+    },
+    {
+      applicationId: 'IDAPP202610310003',
+      studentId: '23EC102',
+      applicationType: 'Renewal',
+      mode: 'SMART',
+      idType: 'Day Scholar ID',
+      idOrientation: 'horizontal',
+      previousStatus: 'College Bus / Day Scholar',
+      currentStatus: 'College Bus / Day Scholar',
+      documents: [],
+      verificationStatus: 'Not Required',
+      verificationReason: '',
+      feeAmount: 75,
+      processingFee: 10,
+      totalAmount: 85,
+      paymentStatus: 'PAID',
+      transactionId: 'TXN202610310003',
+      generated: true,
+      createdAt: new Date('2026-10-29T09:20:00Z'),
+      studentData: {
+        studentId: '23EC102',
+        name: 'Priya Sundaram',
+        department: 'Electronics & Communication',
+        course: 'B.Tech ECE',
+        year: 'II Year',
+        section: 'B',
+        academicYear: '2025 - 2026',
+        dob: '2005-08-22',
+        phone: '+91 98450 11223',
+        email: 'priya.sundaram@campus.edu.in',
+        bloodGroup: 'O+',
+        parentName: 'Sundaram Natarajan',
+        parentPhone: '+91 98450 99887',
+        photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
+        currentStatus: 'College Bus / Day Scholar',
+        previousStatus: 'College Bus / Day Scholar',
+      },
+    },
+  ],
+
+  payments: [
+    {
+      transactionId: 'TXN_VIGNAN_001',
+      applicationId: 'VIGNAN20260001',
+      studentId: '241FA18059',
+      studentName: 'KOTHA BHAVYA SREE',
+      idType: 'Day Scholar ID',
+      amount: 100,
+      currency: 'INR',
+      razorpayOrderId: 'order_vignan_001',
+      razorpayPaymentId: 'pay_vignan_001',
+      razorpaySignature: 'simulated_sig_vignan',
+      paymentMethod: 'UPI (PhonePe / GPay)',
+      status: 'SUCCESS',
+      receiptNumber: 'VIGNAN-RCPT-2026-0001',
+      createdAt: new Date('2026-10-30T10:20:00Z'),
+    },
+    {
+      transactionId: 'TXN202610310001',
+      applicationId: 'IDAPP202610310001',
+      studentId: '22CS084',
+      studentName: 'Aarav Sharma',
+      idType: 'Hosteller ID',
+      amount: 110,
+      currency: 'INR',
+      razorpayOrderId: 'order_test_98765432101',
+      razorpayPaymentId: 'pay_test_88776655441',
+      razorpaySignature: 'simulated_sig_001',
+      paymentMethod: 'UPI (GPay / PhonePe)',
+      status: 'SUCCESS',
+      receiptNumber: 'RCPT-2026-0001',
+      createdAt: new Date('2026-10-30T10:20:00Z'),
+    },
+    {
+      transactionId: 'TXN202610310003',
+      applicationId: 'IDAPP202610310003',
+      studentId: '23EC102',
+      studentName: 'Priya Sundaram',
+      idType: 'Day Scholar ID',
+      amount: 85,
+      currency: 'INR',
+      razorpayOrderId: 'order_test_98765432103',
+      razorpayPaymentId: 'pay_test_88776655443',
+      razorpaySignature: 'simulated_sig_003',
+      paymentMethod: 'Net Banking (HDFC Bank)',
+      status: 'SUCCESS',
+      receiptNumber: 'RCPT-2026-0003',
+      createdAt: new Date('2026-10-29T09:25:00Z'),
+    },
+  ],
+};
+
+let appCounter = 4;
+let txCounter = 4;
+
+export const generateAppId = () => {
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const seq = String(appCounter++).padStart(4, '0');
+  return `IDAPP${dateStr}${seq}`;
+};
+
+export const generateTxnId = () => {
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const seq = String(txCounter++).padStart(4, '0');
+  return `TXN${dateStr}${seq}`;
+};
