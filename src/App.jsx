@@ -34,7 +34,7 @@ import {
   RefreshCw,
   Building,
 } from 'lucide-react';
-
+const API_BASE_URL="https://smart-id-backend-pr3y.onrender.com";
 const INITIAL_STUDENT = {
   studentId: '241FA18059',
   name: 'KOTHA BHAVYA SREE',
@@ -106,7 +106,7 @@ export default function App() {
   // Fetch initial data from backend API
   const fetchApplications = async () => {
     try {
-      const res = await fetch('/api/applications');
+      const res = await fetch('${API_BASE_URL}/api/applications');
       const data = await res.json();
       if (data.success && data.data) {
         setApplications(data.data);
@@ -127,7 +127,7 @@ export default function App() {
 
   const fetchPayments = async () => {
     try {
-      const res = await fetch('/api/payment/history');
+      const res = await fetch('${API_BASE_URL}/api/payment/history');
       const data = await res.json();
       if (data.success && data.data) {
         setPayments(data.data);
@@ -139,7 +139,7 @@ export default function App() {
 
   const fetchFees = async () => {
     try {
-      const res = await fetch('/api/applications/fees');
+      const res = await fetch('${API_BASE_URL}/api/applications/fees');
       const data = await res.json();
       if (data.success && data.data) {
         setFeesConfig(data.data);
@@ -222,7 +222,7 @@ export default function App() {
         ? 'Status Change ID'
         : applicationType;
 
-      const res = await fetch('/api/applications', {
+      const res = await fetch('${API_BASE_URL}/api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -302,7 +302,7 @@ export default function App() {
   // Admin Verification Actions
   const handleApproveApp = async (appId) => {
     try {
-      const res = await fetch(`/api/verification/${appId}/status`, {
+      const res = await fetch(`${API_BASE_URL}/api/verification/${appId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'approve' }),
@@ -336,7 +336,7 @@ export default function App() {
 
   const handleUpdateFees = async (newFees) => {
     try {
-      const res = await fetch('/api/applications/fees', {
+      const res = await fetch('${API_BASE_URL}/api/applications/fees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newFees),
