@@ -200,7 +200,7 @@ export default function Dashboard({
             <div className="stat-val">{myPayments.length}</div>
             <div className="stat-lbl">Payment Receipts</div>
             <div style={{ fontSize: '11px', color: '#2563eb', fontWeight: 600, marginTop: '2px' }}>
-              ₹{totalPaid}.00 Total Paid
+              ₹{totalPaid}.00 {student?.isDemo ? 'Demo Total' : 'Total Paid'}
             </div>
           </div>
         </div>
@@ -506,7 +506,7 @@ export default function Dashboard({
             <div className="panel-card" style={{ padding: '20px' }}>
               <div style={{ marginBottom: '12px', textAlign: 'center' }}>
                 <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>
-                  Your Official Digital Student Card
+                  {student?.isDemo ? 'Your Demo Digital Student Card' : 'Your Official Digital Student Card'}
                 </div>
                 <div style={{ fontSize: '11.5px', color: '#64748b' }}>
                   Authorized credentials encoded for Roll No: {student?.studentId}
@@ -551,7 +551,7 @@ export default function Dashboard({
                 <Lock size={26} />
               </div>
               <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
-                ID Card Locked — Payment Required
+                {student?.isDemo ? 'Demo ID Card Locked — Demo Checkout Required' : 'ID Card Locked — Payment Required'}
               </h4>
               <p
                 style={{
@@ -562,14 +562,22 @@ export default function Dashboard({
                   margin: '0 auto 16px',
                 }}
               >
-                Your official digital card with QR verification and barcode will be unlocked and available for download immediately after completing the ₹100 fee payment.
+                {student?.isDemo
+                  ? 'A sample digital ID card will be unlocked after completing the demo checkout. No real payment is made.'
+                  : 'Your digital card with QR verification and barcode will be available after the required fee payment.'}
               </p>
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
                 onClick={() => onNavigate('apply')}
               >
-                {activeApp ? 'Complete Payment (₹100) & Unlock Card' : 'Apply for ID & Pay Fee'} &rarr;
+                {activeApp
+                  ? (student?.isDemo
+                    ? 'Complete Demo Checkout & Unlock Card'
+                    : 'Complete Payment (₹100) & Unlock Card')
+                  : (student?.isDemo
+                    ? 'Apply for ID & Demo Checkout'
+                    : 'Apply for ID & Pay Fee')} &rarr;
               </button>
             </div>
           )}

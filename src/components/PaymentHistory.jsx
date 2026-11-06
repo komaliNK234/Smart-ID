@@ -16,13 +16,11 @@ import { jsPDF } from 'jspdf';
 export default function PaymentHistory({ payments = [], currentUser, role = 'student' }) {
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterMyPaymentsOnly, setFilterMyPaymentsOnly] = useState(role === 'student');
-
   const currentStudentId = currentUser?.studentId?.trim().toLowerCase();
 
   // Filter payments
   const displayedPayments = payments.filter((p) => {
-    if (filterMyPaymentsOnly && currentStudentId) {
+    if (role === 'student' && currentStudentId) {
       if (p.studentId?.trim().toLowerCase() !== currentStudentId) {
         return false;
       }
@@ -60,9 +58,9 @@ export default function PaymentHistory({ payments = [], currentUser, role = 'stu
   return (
     <div className="payment-history-wrapper">
       <div className="page-header">
-        <h2 className="page-title">Payment History & Tax Receipts</h2>
+        <h2 className="page-title">Payment History & Receipts</h2>
         <p className="page-subtitle">
-          Audited log of all digital college card fee payments and official university receipts.
+          Payment records and downloadable receipts for your CampusID applications.
         </p>
       </div>
 
@@ -86,7 +84,7 @@ export default function PaymentHistory({ payments = [], currentUser, role = 'stu
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Receipt size={18} color="#15803d" />
               <strong style={{ color: '#14532d', fontSize: '14px' }}>
-                {filterMyPaymentsOnly ? 'My Official Receipts' : 'All Institutional Payments'}
+                {role === 'student' ? 'My Payment Records' : 'All Payment Records'}
               </strong>
               <span
                 style={{
@@ -110,23 +108,13 @@ export default function PaymentHistory({ payments = [], currentUser, role = 'stu
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase' }}>
-                Total Fee Settled
+                Total Recorded
               </div>
               <div style={{ fontSize: '18px', fontWeight: 800, color: '#15803d' }}>
                 ₹{totalAmount}.00
               </div>
             </div>
 
-            {role === 'student' && (
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => setFilterMyPaymentsOnly(!filterMyPaymentsOnly)}
-                style={{ background: '#fff', fontSize: '11.5px' }}
-              >
-                {filterMyPaymentsOnly ? 'Show All Students' : 'Show Only Mine'}
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -157,7 +145,7 @@ export default function PaymentHistory({ payments = [], currentUser, role = 'stu
               <th>Student Name</th>
               <th>ID Type</th>
               <th>Amount</th>
-              <th>Payment Method</th>
+              <th>Mode / Method</th>
               <th>Transaction ID</th>
               <th>Date</th>
               <th>Status</th>
@@ -195,8 +183,9 @@ export default function PaymentHistory({ payments = [], currentUser, role = 'stu
                     <strong>₹{item.amount}.00</strong>
                   </td>
                   <td>
-                    <span style={{ fontSize: '11px', color: '#475569' }}>
-                      {item.paymentMethod || 'Razorpay UPI'}
+                    <span className="payment-history-method">
+                      {item.paymentMode === 'DEMO' && <strong>DEMO</strong>}
+                      {item.paymentMethod || 'Payment method unavailable'}
                     </span>
                   </td>
                   <td style={{ fontFamily: 'monospace', fontSize: '11px' }}>
@@ -266,7 +255,9 @@ export default function PaymentHistory({ payments = [], currentUser, role = 'stu
               }}
             >
               <h3 style={{ fontSize: '16px', fontWeight: 800 }}>
-                Official University Payment Receipt
+                {selectedReceipt.paymentMode === 'DEMO'
+                  ? 'CampusID Demonstration Receipt'
+                  : 'University Payment Receipt'}
               </h3>
               <button
                 type="button"
@@ -405,7 +396,9 @@ export default function PaymentHistory({ payments = [], currentUser, role = 'stu
                   marginTop: '16px',
                 }}
               >
-                Official computer-generated university e-receipt. Valid without physical signature.
+                {selectedReceipt.paymentMode === 'DEMO'
+                  ? 'Demonstration record only. No funds were transferred; this is not proof of payment.'
+                  : 'Computer-generated university e-receipt.'}
               </div>
             </div>
 

@@ -26,7 +26,7 @@ export default function PaymentFailure({
         </div>
 
         <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#991b1b' }}>
-          ✕ Payment Failed
+          ✕ Demo payment not completed
         </h2>
         <p style={{ fontSize: '14px', color: '#64748b', marginTop: '6px' }}>
           {errorMessage || 'Your payment could not be completed.'}
@@ -44,7 +44,7 @@ export default function PaymentFailure({
             textAlign: 'left',
           }}
         >
-          <strong>Security Notice:</strong> No funds were deducted from your account. Your ID card generation is locked until the required semester fee payment is verified.
+          <strong>Demo mode:</strong> No funds were transferred. ID generation stays locked until a demo payment completes.
         </div>
 
         <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>

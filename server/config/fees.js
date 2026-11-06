@@ -1,5 +1,5 @@
 // Configurable Fee Rates for CampusID
-// Uniform Flat Fee (₹100 for all processes)
+// Uniform flat fee for all processes.
 export const feeConfig = {
   'New ID': 100,
   'Renewal': 100,

@@ -1,151 +1,209 @@
+import { randomBytes } from 'crypto';
 import { memoryStore, generateTxnId } from '../config/store.js';
 import { Application } from '../models/Application.js';
 import { Payment } from '../models/Payment.js';
 import { getDBStatus } from '../config/db.js';
 
-// 1. Create Sample / Demo Order
+const findApplication = async (applicationId) => {
+  if (getDBStatus()) {
+    const application = await Application.findOne({ applicationId });
+    if (application) return application;
+  }
+  return memoryStore.applications.find(
+    (application) =>
+      application.applicationId?.toLowerCase() === applicationId.toLowerCase()
+  );
+};
+
+const saveApplication = async (application, updates) => {
+  Object.assign(application, updates);
+  if (getDBStatus()) {
+    await Application.updateOne(
+      { applicationId: application.applicationId },
+      { $set: updates }
+    );
+  }
+};
+
 export const createOrder = async (req, res, next) => {
   try {
-    const { applicationId } = req.body;
-
+    const body = req.body || {};
+    const applicationId =
+      typeof body.applicationId === 'string' ? body.applicationId.trim() : '';
     if (!applicationId) {
-      return res.status(400).json({ success: false, message: 'Application ID is required' });
-    }
-
-    const app = memoryStore.applications.find(
-      (a) => a.applicationId.toLowerCase() === applicationId.toLowerCase()
-    );
-
-    if (!app) {
-      return res.status(404).json({ success: false, message: 'Application not found' });
-    }
-
-    // Verification check: if documents are pending, do not allow payment order creation
-    if (app.verificationStatus === 'Pending Verification') {
-      return res.status(403).json({
+      return res.status(400).json({
         success: false,
-        message: 'Cannot proceed to payment: Application documents are pending verification.',
+        message: 'Application ID is required.',
       });
     }
 
-    if (app.verificationStatus === 'Rejected') {
+    const application = await findApplication(applicationId);
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found.' });
+    }
+    if (application.verificationStatus === 'Pending Verification') {
       return res.status(403).json({
         success: false,
-        message: 'Cannot proceed to payment: Application was rejected.',
+        message: 'Payment is unavailable until application documents are verified.',
+      });
+    }
+    if (application.verificationStatus === 'Rejected') {
+      return res.status(403).json({
+        success: false,
+        message: 'Payment is unavailable because the application was rejected.',
+      });
+    }
+    if (application.paymentStatus === 'PAID') {
+      return res.status(409).json({
+        success: false,
+        message: 'This application has already been paid.',
       });
     }
 
-    // Uniform Flat Fee: ₹100
-    const totalAmount = app.totalAmount || 100;
-    const mockOrderId = `VIGNAN_ORDER_${Date.now()}`;
+    const orderId =
+      application.paymentStatus !== 'FAILED' && application.demoOrderId
+        ? application.demoOrderId
+        : `DEMO_ORDER_${Date.now()}_${randomBytes(4).toString('hex')}`;
+    await saveApplication(application, {
+      demoOrderId: orderId,
+      paymentStatus: 'PENDING',
+    });
 
     return res.json({
       success: true,
-      orderId: mockOrderId,
-      amount: totalAmount * 100,
+      orderId,
+      amount: Math.round(Number(application.totalAmount || 100) * 100),
       currency: 'INR',
-      keyId: 'sample_demo_mode',
       isSimulated: true,
-      application: app,
-      message: 'Demo payment order created successfully.',
+      paymentMode: 'DEMO',
+      application,
+      message: 'Demo order created. No money will be moved.',
     });
   } catch (err) {
     next(err);
   }
 };
 
-// 2. Verify / Process Sample Payment
 export const verifyPayment = async (req, res, next) => {
   try {
-    const {
-      applicationId,
-      paymentMethod = 'Sample Demo Payment',
-      forceFail = false,
-    } = req.body;
+    const body = req.body || {};
+    const applicationId =
+      typeof body.applicationId === 'string' ? body.applicationId.trim() : '';
+    const orderId = typeof body.orderId === 'string' ? body.orderId.trim() : '';
+    const paymentMethod =
+      typeof body.paymentMethod === 'string'
+        ? body.paymentMethod.trim()
+        : 'Demo checkout';
 
-    if (!applicationId) {
-      return res.status(400).json({ success: false, message: 'Application ID is required' });
-    }
-
-    const app = memoryStore.applications.find(
-      (a) => a.applicationId.toLowerCase() === applicationId.toLowerCase()
-    );
-
-    if (!app) {
-      return res.status(404).json({ success: false, message: 'Application not found' });
-    }
-
-    if (forceFail) {
-      app.paymentStatus = 'FAILED';
+    if (!applicationId || !orderId) {
       return res.status(400).json({
         success: false,
-        message: 'Payment simulation: transaction was declined by bank or user.',
+        message: 'Application ID and demo order ID are required.',
       });
     }
 
-    // Success! Update application and unlock Digital ID generation
-    const transactionId = generateTxnId();
-    app.paymentStatus = 'PAID';
-    app.transactionId = transactionId;
-    app.generated = true; // Digital ID generation unlocked!
+    const application = await findApplication(applicationId);
+    if (!application) {
+      return res.status(404).json({ success: false, message: 'Application not found.' });
+    }
 
+    if (application.demoOrderId !== orderId || !orderId.startsWith('DEMO_ORDER_')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Demo order is invalid or has expired. Create a new order and try again.',
+      });
+    }
+
+    if (application.paymentStatus === 'PAID') {
+      let payment = memoryStore.payments.find(
+        (record) => record.applicationId === application.applicationId
+      );
+      if (!payment && getDBStatus()) {
+        payment = await Payment.findOne({ applicationId: application.applicationId });
+      }
+      if (payment) {
+        return res.json({
+          success: true,
+          message: 'This demo order has already been completed.',
+          data: { payment, application },
+        });
+      }
+      return res.status(409).json({
+        success: false,
+        message: 'Application is already marked paid.',
+      });
+    }
+
+    if (application.verificationStatus === 'Pending Verification' ||
+        application.verificationStatus === 'Rejected') {
+      return res.status(403).json({
+        success: false,
+        message: 'Application is not cleared for payment.',
+      });
+    }
+
+    if (body.forceFail === true) {
+      await saveApplication(application, {
+        paymentStatus: 'FAILED',
+        demoOrderId: null,
+      });
+      return res.status(402).json({
+        success: false,
+        message: 'Demo failure scenario selected. No payment was made.',
+      });
+    }
+
+    const transactionId = generateTxnId();
     const paymentRecord = {
       transactionId,
-      applicationId: app.applicationId,
-      studentId: app.studentId,
-      studentName: app.studentData?.name || 'Student',
-      idType: app.idType,
-      amount: app.totalAmount || 100,
+      applicationId: application.applicationId,
+      studentId: application.studentId,
+      studentName: application.studentData?.name || 'Student',
+      idType: application.idType,
+      amount: Number(application.totalAmount || 100),
       currency: 'INR',
-      paymentMethod,
+      paymentMethod: `Demo: ${paymentMethod}`,
+      paymentMode: 'DEMO',
       status: 'SUCCESS',
-      receiptNumber: `VIGNAN-RCPT-${new Date().getFullYear()}-${transactionId.slice(-4)}`,
+      receiptNumber: `DEMO-RCPT-${new Date().getFullYear()}-${transactionId.slice(-4)}`,
       createdAt: new Date(),
     };
 
-    memoryStore.payments.unshift(paymentRecord);
-
     if (getDBStatus()) {
-      await Application.updateOne(
-        { applicationId: app.applicationId },
-        {
-          paymentStatus: 'PAID',
-          transactionId,
-          generated: true,
-        }
-      );
       await Payment.create(paymentRecord);
     }
+    memoryStore.payments.unshift(paymentRecord);
+
+    await saveApplication(application, {
+      paymentStatus: 'PAID',
+      transactionId,
+      generated: true,
+    });
 
     return res.json({
       success: true,
-      message: 'Sample payment completed successfully and ID generated.',
-      data: {
-        payment: paymentRecord,
-        application: app,
-      },
+      message: 'Demo payment completed. No funds were transferred.',
+      data: { payment: paymentRecord, application },
     });
   } catch (err) {
     next(err);
   }
 };
 
-// 3. Payment History
 export const getPaymentHistory = async (req, res, next) => {
   try {
     const { studentId } = req.query;
     let list = memoryStore.payments;
 
     if (getDBStatus()) {
-      try {
-        list = await Payment.find().sort({ createdAt: -1 });
-      } catch (e) {
-        list = memoryStore.payments;
-      }
+      list = await Payment.find().sort({ createdAt: -1 });
     }
 
     if (studentId) {
-      list = list.filter((p) => p.studentId.toLowerCase() === studentId.toLowerCase());
+      list = list.filter(
+        (payment) =>
+          payment.studentId?.toLowerCase() === String(studentId).toLowerCase()
+      );
     }
 
     return res.json({ success: true, count: list.length, data: list });

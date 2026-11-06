@@ -51,6 +51,7 @@ const applicationSchema = new mongoose.Schema(
       default: 'PENDING',
     },
     transactionId: { type: String },
+    demoOrderId: { type: String },
     generated: { type: Boolean, default: false },
     studentData: { type: Object },
     createdAt: { type: Date, default: Date.now },

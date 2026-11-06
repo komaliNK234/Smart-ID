@@ -18,12 +18,10 @@ export default function ApplicationStatus({
   role = 'student',
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterMyAppsOnly, setFilterMyAppsOnly] = useState(role === 'student');
-
   const currentStudentId = currentUser?.studentId?.trim().toLowerCase();
 
   const filtered = applications.filter((app) => {
-    if (filterMyAppsOnly && currentStudentId) {
+    if (role === 'student' && currentStudentId) {
       if (app.studentId?.trim().toLowerCase() !== currentStudentId) {
         return false;
       }
@@ -64,7 +62,7 @@ export default function ApplicationStatus({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <strong style={{ color: '#1e3a8a', fontSize: '13.5px' }}>
-                {filterMyAppsOnly ? 'My ID Applications' : 'All Student Applications'}
+                {role === 'student' ? 'My ID Applications' : 'All Student Applications'}
               </strong>
               <span className="badge-pill" style={{ background: '#2563eb', color: '#fff' }}>
                 {filtered.length} Requests
@@ -76,16 +74,6 @@ export default function ApplicationStatus({
             </div>
           </div>
 
-          {role === 'student' && (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => setFilterMyAppsOnly(!filterMyAppsOnly)}
-              style={{ background: '#fff', fontSize: '11.5px' }}
-            >
-              {filterMyAppsOnly ? 'Show All Students' : 'Show Only Mine'}
-            </button>
-          )}
         </div>
       )}
 

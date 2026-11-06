@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const studentSchema = new mongoose.Schema(
   {
     studentId: { type: String, required: true, unique: true },
+    passwordHash: { type: String, select: false },
     name: { type: String, required: true },
     department: { type: String, required: true },
     course: { type: String, required: true },
@@ -15,6 +16,7 @@ const studentSchema = new mongoose.Schema(
     bloodGroup: { type: String, default: 'O+' },
     parentName: { type: String, required: true },
     parentPhone: { type: String, required: true },
+    address: { type: String },
     photo: { type: String },
     currentStatus: {
       type: String,

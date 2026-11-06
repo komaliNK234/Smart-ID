@@ -44,7 +44,6 @@ export const sample1000Students = Array.from({ length: 1000 }, (_, index) => {
       : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
     currentStatus: status,
     previousStatus: status,
-    password: 'student123',
   };
 });
 
@@ -68,7 +67,6 @@ export const memoryStore = {
       photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
       currentStatus: 'College Bus / Day Scholar',
       previousStatus: 'College Bus / Day Scholar',
-      password: 'student123',
     },
     {
       studentId: '22CS084',
@@ -87,7 +85,6 @@ export const memoryStore = {
       photo: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
       currentStatus: 'College Hostel',
       previousStatus: 'College Hostel',
-      password: 'student123',
     },
     {
       studentId: '22ME045',
@@ -107,7 +104,6 @@ export const memoryStore = {
       photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
       currentStatus: 'Outside Hostel / PG',
       previousStatus: 'College Hostel',
-      password: 'student123',
     },
     {
       studentId: '23EC102',
@@ -127,7 +123,6 @@ export const memoryStore = {
       photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
       currentStatus: 'College Bus / Day Scholar',
       previousStatus: 'College Bus / Day Scholar',
-      password: 'student123',
     },
   ],
 
@@ -272,10 +267,11 @@ export const memoryStore = {
       idType: 'Day Scholar ID',
       amount: 100,
       currency: 'INR',
+      paymentMode: 'DEMO',
       razorpayOrderId: 'order_vignan_001',
       razorpayPaymentId: 'pay_vignan_001',
       razorpaySignature: 'simulated_sig_vignan',
-      paymentMethod: 'UPI (PhonePe / GPay)',
+      paymentMethod: 'Demo: UPI',
       status: 'SUCCESS',
       receiptNumber: 'VIGNAN-RCPT-2026-0001',
       createdAt: new Date('2026-10-30T10:20:00Z'),
@@ -288,10 +284,11 @@ export const memoryStore = {
       idType: 'Hosteller ID',
       amount: 110,
       currency: 'INR',
+      paymentMode: 'DEMO',
       razorpayOrderId: 'order_test_98765432101',
       razorpayPaymentId: 'pay_test_88776655441',
       razorpaySignature: 'simulated_sig_001',
-      paymentMethod: 'UPI (GPay / PhonePe)',
+      paymentMethod: 'Demo: UPI',
       status: 'SUCCESS',
       receiptNumber: 'RCPT-2026-0001',
       createdAt: new Date('2026-10-30T10:20:00Z'),
@@ -304,10 +301,11 @@ export const memoryStore = {
       idType: 'Day Scholar ID',
       amount: 85,
       currency: 'INR',
+      paymentMode: 'DEMO',
       razorpayOrderId: 'order_test_98765432103',
       razorpayPaymentId: 'pay_test_88776655443',
       razorpaySignature: 'simulated_sig_003',
-      paymentMethod: 'Net Banking (HDFC Bank)',
+      paymentMethod: 'Demo: Net Banking',
       status: 'SUCCESS',
       receiptNumber: 'RCPT-2026-0003',
       createdAt: new Date('2026-10-29T09:25:00Z'),

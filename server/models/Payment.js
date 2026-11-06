@@ -13,6 +13,7 @@ const paymentSchema = new mongoose.Schema(
     razorpayPaymentId: { type: String },
     razorpaySignature: { type: String },
     paymentMethod: { type: String, default: 'Razorpay / UPI / NetBanking' },
+    paymentMode: { type: String, enum: ['DEMO', 'LIVE'], default: 'LIVE' },
     status: {
       type: String,
       enum: ['PENDING', 'SUCCESS', 'FAILED'],

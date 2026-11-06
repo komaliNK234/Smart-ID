@@ -34,9 +34,7 @@ app.get('/api/health', (req, res) => {
     status: 'ONLINE',
     system: 'CampusID — Digital College ID Management System API',
     mongoConnected: getDBStatus(),
-    razorpayConfigured: Boolean(
-      process.env.RAZORPAY_KEY_ID && !process.env.RAZORPAY_KEY_ID.includes('your_')
-    ),
+    paymentMode: 'DEMO',
     timestamp: new Date().toISOString(),
   });
 });

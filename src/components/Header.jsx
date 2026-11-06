@@ -16,6 +16,7 @@ export default function Header({
   currentUser,
   onLogout,
   onSwitchAccount,
+  apiStatus = 'checking',
 }) {
   return (
     <header className="header">
@@ -52,14 +53,16 @@ export default function Header({
           >
             <UserCheck size={14} /> Student View
           </button>
-          <button
-            type="button"
-            className={`role-btn ${role === 'admin' ? 'active' : ''}`}
-            onClick={() => onRoleChange('admin')}
-            title="Switch to Officer Verification & Admin View"
-          >
-            <ShieldCheck size={14} /> Admin / Verifier
-          </button>
+          {currentUser?.role === 'admin' && (
+            <button
+              type="button"
+              className={`role-btn ${role === 'admin' ? 'active' : ''}`}
+              onClick={() => onRoleChange('admin')}
+              title="Switch to Officer Verification & Admin View"
+            >
+              <ShieldCheck size={14} /> Admin / Verifier
+            </button>
+          )}
         </div>
 
         {/* User Profile Pill & Logout Button */}
@@ -145,11 +148,11 @@ export default function Header({
             alignItems: 'center',
             gap: '8px',
             fontSize: '12px',
-            color: '#16a34a',
-            background: '#f0fdf4',
+            color: apiStatus === 'online' ? '#16a34a' : apiStatus === 'offline' ? '#dc2626' : '#64748b',
+            background: apiStatus === 'online' ? '#f0fdf4' : apiStatus === 'offline' ? '#fef2f2' : '#f1f5f9',
             padding: '5px 10px',
             borderRadius: '999px',
-            border: '1px solid #bbf7d0',
+            border: `1px solid ${apiStatus === 'online' ? '#bbf7d0' : apiStatus === 'offline' ? '#fecaca' : '#e2e8f0'}`,
           }}
         >
           <span
@@ -157,11 +160,11 @@ export default function Header({
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              background: '#22c55e',
+              background: apiStatus === 'online' ? '#22c55e' : apiStatus === 'offline' ? '#ef4444' : '#94a3b8',
               display: 'inline-block',
             }}
           ></span>
-          <strong>Online</strong>
+          <strong>{apiStatus === 'online' ? 'API Online' : apiStatus === 'offline' ? 'API Offline' : 'Connecting'}</strong>
         </div>
       </div>
     </header>

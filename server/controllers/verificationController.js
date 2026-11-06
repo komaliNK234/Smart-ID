@@ -28,9 +28,15 @@ export const updateVerificationStatus = async (req, res, next) => {
     const { id } = req.params;
     const { action, reason } = req.body; // action: 'approve' | 'reject'
 
-    const app = memoryStore.applications.find(
-      (a) => a.applicationId.toLowerCase() === id.toLowerCase()
-    );
+    let app = null;
+    if (getDBStatus()) {
+      app = await Application.findOne({ applicationId: id });
+    }
+    if (!app) {
+      app = memoryStore.applications.find(
+        (a) => a.applicationId.toLowerCase() === id.toLowerCase()
+      );
+    }
 
     if (!app) {
       return res.status(404).json({ success: false, message: 'Application not found' });

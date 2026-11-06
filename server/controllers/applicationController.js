@@ -14,6 +14,7 @@ export const updateFees = (req, res) => {
 
 export const createApplication = async (req, res, next) => {
   try {
+    const body = req.body || {};
     const {
       studentId,
       studentData,
@@ -23,7 +24,7 @@ export const createApplication = async (req, res, next) => {
       previousStatus = 'College Hostel',
       idOrientationChoice = 'horizontal',
       documents = [],
-    } = req.body;
+    } = body;
 
     if (!studentId || !studentData || !studentData.name) {
       return res.status(400).json({
@@ -192,9 +193,15 @@ export const uploadApplicationDocument = async (req, res, next) => {
     const { id } = req.params;
     const { documentType, fileName, fileSize, fileData } = req.body;
 
-    const app = memoryStore.applications.find(
-      (a) => a.applicationId.toLowerCase() === id.toLowerCase()
-    );
+    let app = null;
+    if (getDBStatus()) {
+      app = await Application.findOne({ applicationId: id });
+    }
+    if (!app) {
+      app = memoryStore.applications.find(
+        (a) => a.applicationId.toLowerCase() === id.toLowerCase()
+      );
+    }
 
     if (!app) {
       return res.status(404).json({ success: false, message: 'Application not found' });

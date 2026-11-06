@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
-import ModeSelector from './components/ModeSelector';
-import StudentForm from './components/StudentForm';
-import StudentStatus from './components/StudentStatus';
 import DocumentUpload from './components/DocumentUpload';
-import FeeSummary from './components/FeeSummary';
 import Payment from './components/Payment';
 import PaymentSuccess from './components/PaymentSuccess';
 import PaymentFailure from './components/PaymentFailure';
@@ -17,6 +13,7 @@ import IDCard from './components/IDCard';
 import DownloadButton from './components/DownloadButton';
 import ApplicationWizard from './components/ApplicationWizard';
 import Login from './components/Login';
+import { apiRequest } from './api';
 
 import {
   LayoutDashboard,
@@ -26,15 +23,8 @@ import {
   CreditCard,
   CreditCard as IdIcon,
   ShieldCheck,
-  User,
   LogOut,
-  Sparkles,
-  ArrowRight,
-  CheckCircle2,
-  RefreshCw,
-  Building,
 } from 'lucide-react';
-const API_BASE_URL="https://smart-id-backend-pr3y.onrender.com";
 const INITIAL_STUDENT = {
   studentId: '241FA18059',
   name: 'KOTHA BHAVYA SREE',
@@ -70,7 +60,9 @@ export default function App() {
   const [mode, setMode] = useState('SMART'); // 'SMART' | 'COMMON'
   const [applicationType, setApplicationType] = useState('New ID');
 
-  const [student, setStudent] = useState(currentUser || INITIAL_STUDENT);
+  const [student, setStudent] = useState(
+    currentUser?.role === 'admin' ? currentUser : currentUser || INITIAL_STUDENT
+  );
   const [documents, setDocuments] = useState([]);
   const [applications, setApplications] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -85,14 +77,15 @@ export default function App() {
   const [activeApplication, setActiveApplication] = useState(null);
   const [paymentView, setPaymentView] = useState('NONE'); // 'NONE' | 'CHECKOUT' | 'SUCCESS' | 'FAILURE'
   const [paymentResultData, setPaymentResultData] = useState(null);
-  const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiStatus, setApiStatus] = useState('checking');
 
   // Sync state when currentUser changes
   useEffect(() => {
     if (currentUser) {
       if (currentUser.role === 'admin') {
         setRole('admin');
+        setStudent(currentUser);
       } else {
         setRole('student');
         setStudent((prev) => ({
@@ -104,56 +97,71 @@ export default function App() {
   }, [currentUser]);
 
   // Fetch initial data from backend API
-  const fetchApplications = async () => {
+  const fetchApplications = async (user = currentUser) => {
     try {
-      const res = await fetch('${API_BASE_URL}/api/applications');
-      const data = await res.json();
-      if (data.success && data.data) {
+      const query = user?.studentId
+        ? `?studentId=${encodeURIComponent(user.studentId)}`
+        : '';
+      const data = await apiRequest(`/api/applications${query}`);
+      if (data.data) {
         setApplications(data.data);
-        if (currentUser?.studentId) {
+        if (user?.studentId) {
           const myApp = data.data.find(
-            (a) => a.studentId?.toLowerCase() === currentUser.studentId.toLowerCase()
+            (a) => a.studentId?.toLowerCase() === user.studentId.toLowerCase()
           );
-          if (myApp) setActiveApplication(myApp);
-          else if (!activeApplication && data.data.length > 0) setActiveApplication(data.data[0]);
+          setActiveApplication(myApp || null);
+          setDocuments(myApp?.documents || []);
         } else if (!activeApplication && data.data.length > 0) {
           setActiveApplication(data.data[0]);
         }
       }
     } catch (err) {
-      console.warn('Backend offline, using fallback state.');
+      console.error('Unable to load applications:', err.message);
     }
   };
 
-  const fetchPayments = async () => {
+  const fetchPayments = async (user = currentUser) => {
     try {
-      const res = await fetch('${API_BASE_URL}/api/payment/history');
-      const data = await res.json();
-      if (data.success && data.data) {
+      const query = user?.studentId
+        ? `?studentId=${encodeURIComponent(user.studentId)}`
+        : '';
+      const data = await apiRequest(`/api/payment/history${query}`);
+      if (data.data) {
         setPayments(data.data);
       }
     } catch (err) {
-      console.warn('Backend payment history fetch offline.');
+      console.error('Unable to load payment history:', err.message);
     }
   };
 
   const fetchFees = async () => {
     try {
-      const res = await fetch('${API_BASE_URL}/api/applications/fees');
-      const data = await res.json();
-      if (data.success && data.data) {
+      const data = await apiRequest('/api/applications/fees');
+      if (data.data) {
         setFeesConfig(data.data);
       }
     } catch (err) {
-      console.warn('Backend fees fetch offline.');
+      console.error('Unable to load fee configuration:', err.message);
+    }
+  };
+
+  const checkApiHealth = async () => {
+    try {
+      await apiRequest('/api/health');
+      setApiStatus('online');
+    } catch (err) {
+      setApiStatus('offline');
+      console.error('CampusID API is unavailable:', err.message);
     }
   };
 
   useEffect(() => {
-    fetchApplications();
-    fetchPayments();
+    if (!currentUser) return;
+    checkApiHealth();
+    fetchApplications(currentUser);
+    fetchPayments(currentUser);
     fetchFees();
-  }, []);
+  }, [currentUser]);
 
   // Compute live ID orientation and type based on business rules
   const isHostel = student.currentStatus === 'College Hostel';
@@ -202,16 +210,17 @@ export default function App() {
       }
     }
 
-    setFormErrors(errs);
-    return Object.keys(errs).length === 0;
+    return errs;
   };
 
   // Handle Application Submission & Payment Proceed
   const handleProceedToPayment = async () => {
-    if (!validateForm()) {
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
       alert(
-        formErrors.documents ||
-          'Please complete all required fields and upload the mandatory Hostel Vacated Receipt.'
+        errors.documents ||
+          Object.values(errors)[0] ||
+          'Please complete all required fields before proceeding.'
       );
       return;
     }
@@ -222,9 +231,8 @@ export default function App() {
         ? 'Status Change ID'
         : applicationType;
 
-      const res = await fetch('${API_BASE_URL}/api/applications', {
+      const resData = await apiRequest('/api/applications', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studentId: student.studentId,
           studentData: student,
@@ -236,11 +244,6 @@ export default function App() {
           documents,
         }),
       });
-
-      const resData = await res.json();
-      if (!resData.success) {
-        throw new Error(resData.message || 'Failed to submit application');
-      }
 
       const createdApp = resData.data;
       setActiveApplication(createdApp);
@@ -302,72 +305,65 @@ export default function App() {
   // Admin Verification Actions
   const handleApproveApp = async (appId) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/verification/${appId}/status`, {
+      await apiRequest(`/api/verification/${appId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'approve' }),
       });
-      const data = await res.json();
-      if (data.success) {
-        alert('Application approved successfully! Student can now pay the fee.');
-        await fetchApplications();
-      }
+      alert('Application approved successfully! Student can now pay the fee.');
+      await fetchApplications();
     } catch (err) {
-      alert('Error approving application');
+      alert(err.message || 'Error approving application.');
     }
   };
 
   const handleRejectApp = async (appId, reason) => {
     try {
-      const res = await fetch(`/api/verification/${appId}/status`, {
+      await apiRequest(`/api/verification/${appId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject', reason }),
       });
-      const data = await res.json();
-      if (data.success) {
-        alert('Application rejected with reason.');
-        await fetchApplications();
-      }
+      alert('Application rejected with reason.');
+      await fetchApplications();
     } catch (err) {
-      alert('Error rejecting application');
+      alert(err.message || 'Error rejecting application.');
     }
   };
 
   const handleUpdateFees = async (newFees) => {
     try {
-      const res = await fetch('${API_BASE_URL}/api/applications/fees', {
+      const data = await apiRequest('/api/applications/fees', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newFees),
       });
-      const data = await res.json();
-      if (data.success) {
-        setFeesConfig(data.data);
-        alert('Fee configuration updated successfully!');
-      }
+      setFeesConfig(data.data);
+      alert('Fee configuration updated successfully!');
     } catch (err) {
-      alert('Error updating fees');
+      alert(err.message || 'Error updating fees.');
     }
   };
 
   // Login handler
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
+    setApplicationType('New ID');
+    setMode('SMART');
+    setDocuments([]);
+    setPaymentView('NONE');
+    setPaymentResultData(null);
     try {
       localStorage.setItem('campusid_auth_user', JSON.stringify(user));
     } catch (e) {}
 
     if (user.role === 'admin') {
       setRole('admin');
+      setStudent(user);
       setCurrentTab('admin');
     } else {
       setRole('student');
       setStudent(user);
       setCurrentTab('dashboard');
     }
-    fetchApplications();
-    fetchPayments();
+    setActiveApplication(null);
   };
 
   // Logout handler
@@ -377,20 +373,20 @@ export default function App() {
     setCurrentTab('dashboard');
     setPaymentView('NONE');
     setDocuments([]);
+    setApplicationType('New ID');
+    setMode('SMART');
+    setStudent(INITIAL_STUDENT);
+    setPaymentResultData(null);
+    setActiveApplication(null);
+    setApplications([]);
+    setPayments([]);
+    setRole('student');
   };
 
   // If user is not logged in, render Login Portal
   if (!currentUser) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
-
-  // Base fee calculation
-  const currentBaseFee =
-    feesConfig[
-      isStatusChangeActive ? 'Status Change ID' : applicationType
-    ] ?? 100;
-  const currentProcessingFee = feesConfig.processingFee ?? 0;
-  const currentTotalFee = currentBaseFee + currentProcessingFee;
 
   return (
     <div className="app-shell">
@@ -493,7 +489,7 @@ export default function App() {
             OFFICER & ADMIN
           </div>
 
-          <button
+          {currentUser.role === 'admin' && <button
             type="button"
             className={`nav-item ${currentTab === 'admin' ? 'active' : ''}`}
             onClick={() => {
@@ -504,9 +500,9 @@ export default function App() {
           >
             <ShieldCheck size={18} />
             <span>Admin Panel</span>
-          </button>
+          </button>}
 
-          <button
+          {currentUser.role === 'admin' && <button
             type="button"
             className={`nav-item ${currentTab === 'verification' ? 'active' : ''}`}
             onClick={() => {
@@ -528,6 +524,7 @@ export default function App() {
               </span>
             )}
           </button>
+          }
         </nav>
 
         <div className="sidebar-footer">
@@ -589,7 +586,9 @@ export default function App() {
       <div className="main-wrapper">
         <Header
           role={role}
+          apiStatus={apiStatus}
           onRoleChange={(newRole) => {
+            if (newRole === 'admin' && currentUser.role !== 'admin') return;
             setRole(newRole);
             if (newRole === 'admin') setCurrentTab('admin');
             else setCurrentTab('dashboard');
@@ -599,6 +598,16 @@ export default function App() {
         />
 
         <main className="content-container">
+          {apiStatus === 'offline' && (
+            <div className="api-offline-banner" role="alert">
+              CampusID API is unavailable. Account, application, verification, and payment changes cannot be saved right now.
+            </div>
+          )}
+          {currentUser.isDemo && (
+            <div className="demo-account-banner" role="note">
+              Demonstration account — records, verification, receipts, and payments are sample data only.
+            </div>
+          )}
           {/* TAB 1: DASHBOARD */}
           {currentTab === 'dashboard' && (
             <Dashboard
@@ -609,6 +618,7 @@ export default function App() {
               onSelectApplication={(app) => {
                 setActiveApplication(app);
                 if (app.studentData) setStudent(app.studentData);
+                setDocuments(app.documents || []);
               }}
             />
           )}
@@ -678,6 +688,7 @@ export default function App() {
               onSelectApplication={(app) => {
                 setActiveApplication(app);
                 if (app.studentData) setStudent(app.studentData);
+                setDocuments(app.documents || []);
                 setCurrentTab('my-id');
               }}
             />
@@ -723,24 +734,35 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="panel-card" style={{ padding: '32px', textAlign: 'center' }}>
-                <div style={{ display: 'inline-block', marginBottom: '20px' }}>
-                  <IDCard
-                    student={student}
-                    mode={activeApplication?.mode || mode}
-                    idType={activeApplication?.idType || computedIdType}
-                    idOrientation={activeApplication?.idOrientation || computedOrientation}
-                  />
-                </div>
+              {activeApplication?.generated && activeApplication.paymentStatus === 'PAID' ? (
+                <div className="panel-card" style={{ padding: '32px', textAlign: 'center' }}>
+                  <div style={{ display: 'inline-block', marginBottom: '20px' }}>
+                    <IDCard
+                      student={student}
+                      mode={activeApplication.mode || mode}
+                      idType={activeApplication.idType || computedIdType}
+                      idOrientation={activeApplication.idOrientation || computedOrientation}
+                    />
+                  </div>
 
-                <div style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center' }}>
-                  <DownloadButton
-                    student={student}
-                    application={activeApplication}
-                    onDownloadReceipt={() => setCurrentTab('history')}
-                  />
+                  <div style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center' }}>
+                    <DownloadButton
+                      student={student}
+                      application={activeApplication}
+                      onDownloadReceipt={() => setCurrentTab('history')}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="panel-card id-not-issued">
+                  <ShieldCheck size={28} />
+                  <h3>Your digital ID is not available yet</h3>
+                  <p>Complete application review and payment before the card can be issued.</p>
+                  <button type="button" className="btn btn-primary" onClick={() => setCurrentTab('apply')}>
+                    Apply for an ID
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -756,6 +778,7 @@ export default function App() {
               onSelectApplication={(app) => {
                 setActiveApplication(app);
                 if (app.studentData) setStudent(app.studentData);
+                setDocuments(app.documents || []);
                 setCurrentTab('my-id');
               }}
             />

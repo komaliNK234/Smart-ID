@@ -1,128 +1,84 @@
+import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { Student } from '../models/Student.js';
 import { memoryStore } from '../config/store.js';
 import { getDBStatus } from '../config/db.js';
 
-// Login handler for students and administrators
+const hashPassword = (password) => {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${hash}`;
+};
+
+const verifyPassword = (password, passwordHash) => {
+  if (!passwordHash) return false;
+  const [algorithm, salt, storedHash] = passwordHash.split('$');
+  if (algorithm !== 'scrypt' || !salt || !storedHash) return false;
+
+  const expected = Buffer.from(storedHash, 'hex');
+  if (expected.length !== 64) return false;
+  const actual = scryptSync(password, salt, expected.length);
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+};
+
+const publicStudent = (student) => {
+  const user = student?.toObject ? student.toObject() : { ...student };
+  delete user.password;
+  delete user.passwordHash;
+  return { role: 'student', ...user };
+};
+
+const findMemoryStudent = (identifier) =>
+  memoryStore.students.find(
+    (student) =>
+      student.studentId?.toLowerCase() === identifier ||
+      student.email?.toLowerCase() === identifier
+  );
+
+const exactMatch = (value) => ({
+  $regex: `^${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+  $options: 'i',
+});
+
 export const login = async (req, res, next) => {
   try {
-    const { identifier, password, role = 'student' } = req.body;
+    const body = req.body || {};
+    const identifier =
+      typeof body.identifier === 'string' ? body.identifier.trim().toLowerCase() : '';
+    const password = typeof body.password === 'string' ? body.password : '';
 
-    if (!identifier) {
+    if (!identifier || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Student Roll No / ID or Username is required',
+        message: 'Registration number/email and password are required.',
       });
     }
 
-    // 1. Admin Login
-    if (role === 'admin' || identifier.toLowerCase() === 'admin') {
-      const validAdminPass = !password || password === 'admin123' || password === 'admin';
-      if (!validAdminPass) {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid administrator password. (Default: admin123)',
-        });
-      }
-
-      return res.json({
-        success: true,
-        message: 'Administrator authentication successful',
-        user: {
-          role: 'admin',
-          username: 'admin',
-          name: 'Administrative Officer',
-          title: 'Chief Identity Officer',
-          department: 'Campus Security & Identity Authority',
-          email: 'admin.id@vignan.ac.in',
-        },
-      });
-    }
-
-    // 2. Student Login
-    let student = null;
-    const cleanId = identifier.trim().toLowerCase();
-
+    let student;
     if (getDBStatus()) {
-      try {
-        student = await Student.findOne({
-          $or: [
-            { studentId: { $regex: new RegExp(`^${cleanId}$`, 'i') } },
-            { email: { $regex: new RegExp(`^${cleanId}$`, 'i') } },
-          ],
-        });
-      } catch (err) {
-        student = null;
-      }
+      student = await Student.findOne({
+        $or: [{ studentId: exactMatch(identifier) }, { email: exactMatch(identifier) }],
+      }).select('+passwordHash');
+    } else {
+      student = findMemoryStudent(identifier);
     }
 
-    if (!student) {
-      student = memoryStore.students.find(
-        (s) =>
-          s.studentId.toLowerCase() === cleanId ||
-          s.email?.toLowerCase() === cleanId
-      );
-    }
-
-    if (!student) {
-      // Auto-create account for any new student registration number
-      const upperRegNo = identifier.trim().toUpperCase();
-      student = {
-        studentId: upperRegNo,
-        name: `STUDENT ${upperRegNo}`,
-        department: 'Computer Science & Engineering',
-        course: 'B.TECH',
-        year: 'I Year',
-        section: '1',
-        academicYear: '2024 - 2028',
-        dob: '2006-08-15',
-        phone: '9848012345',
-        email: `${upperRegNo.toLowerCase()}@vignan.ac.in`,
-        parentName: 'GUARDIAN',
-        parentPhone: '9848012345',
-        address: '# Campus Registry, Vadlamudi, Guntur - 522213',
-        photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        currentStatus: 'College Bus / Day Scholar',
-        previousStatus: 'College Bus / Day Scholar',
-        password: password || 'student123',
-      };
-      memoryStore.students.unshift(student);
-      if (getDBStatus()) {
-        try {
-          await Student.create(student);
-        } catch (e) {}
-      }
-    }
-
-    // Password validation (default to student123 or matches DOB if set)
-    const expectedPassword = student.password || 'student123';
-    const isValidPassword =
-      !password ||
-      password === expectedPassword ||
-      password === 'student123' ||
-      password === student.dob;
-
-    if (!isValidPassword) {
+    if (!student || !verifyPassword(password, student.passwordHash)) {
       return res.status(401).json({
         success: false,
-        message: 'Incorrect password. Default demo password is "student123".',
+        message: 'Invalid registration number/email or password.',
       });
     }
 
-    // Return authenticated student data
     return res.json({
       success: true,
       message: `Welcome back, ${student.name}!`,
-      user: {
-        role: 'student',
-        ...student,
-      },
+      user: publicStudent(student),
     });
   } catch (err) {
     next(err);
   }
 };
 
-// Register a new student account
 export const register = async (req, res, next) => {
   try {
     const {
@@ -133,117 +89,146 @@ export const register = async (req, res, next) => {
       year = 'I Year',
       section = '1',
       academicYear = '2025 - 2029',
-      dob = '2006-01-01',
+      dob,
       phone,
       email,
       parentName,
       parentPhone,
       currentStatus = 'College Bus / Day Scholar',
-      password = 'student123',
-    } = req.body;
+      password,
+    } = req.body || {};
 
-    if (!studentId || !name || !department || !email) {
+    const cleanId = typeof studentId === 'string' ? studentId.trim().toUpperCase() : '';
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const cleanName = typeof name === 'string' ? name.trim() : '';
+    if (
+      !cleanId ||
+      !cleanName ||
+      !department?.trim?.() ||
+      !course?.trim?.() ||
+      !phone?.trim?.() ||
+      !parentName?.trim?.() ||
+      !parentPhone?.trim?.() ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) ||
+      typeof password !== 'string' ||
+      password.length < 8
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Roll Number, Full Name, Department, and Email are required.',
+        message: 'Enter all required student details, a valid email, and a password of at least 8 characters.',
       });
     }
 
-    const cleanId = studentId.trim();
-
-    // Check duplicate in memoryStore
-    const existing = memoryStore.students.find(
-      (s) => s.studentId.toLowerCase() === cleanId.toLowerCase()
-    );
-
-    if (existing) {
-      return res.status(400).json({
-        success: false,
-        message: `A student account with Roll Number "${cleanId}" already exists. Please log in instead.`,
-      });
-    }
-
-    const newStudent = {
-      studentId: cleanId.toUpperCase(),
-      name: name.trim().toUpperCase(),
-      department,
-      course,
+    const passwordHash = hashPassword(password);
+    const profile = {
+      studentId: cleanId,
+      name: cleanName,
+      department: department.trim(),
+      course: course.trim(),
       year,
       section,
       academicYear,
       dob,
-      phone: phone || '9999999999',
-      email: email.trim().toLowerCase(),
-      parentName: parentName || 'Guardian',
-      parentPhone: parentPhone || phone || '9999999999',
-      address: '# Campus Registry, University Main Gate',
-      photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      phone: phone.trim(),
+      email: cleanEmail,
+      parentName: parentName.trim(),
+      parentPhone: parentPhone.trim(),
       currentStatus,
       previousStatus: currentStatus,
-      password,
+      address: '# Campus Registry, University Main Gate',
+      photo: '',
     };
 
+    let student;
     if (getDBStatus()) {
-      try {
-        await Student.create(newStudent);
-      } catch (err) {
-        console.warn('DB student insert fallback to memoryStore');
+      const emailOwner = await Student.findOne({ email: exactMatch(cleanEmail) });
+      if (emailOwner && emailOwner.studentId.toLowerCase() !== cleanId.toLowerCase()) {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this email address already exists.',
+        });
+      }
+      student = await Student.findOne({ studentId: exactMatch(cleanId) }).select('+passwordHash');
+      if (student?.passwordHash) {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this registration number already exists. Please sign in.',
+        });
+      }
+
+      if (student) {
+        Object.assign(student, profile, { passwordHash });
+        await student.save();
+      } else {
+        student = await Student.create({ ...profile, passwordHash });
+      }
+    } else {
+      const emailOwner = memoryStore.students.find(
+        (existingStudent) =>
+          existingStudent.email?.toLowerCase() === cleanEmail &&
+          existingStudent.studentId?.toLowerCase() !== cleanId.toLowerCase()
+      );
+      if (emailOwner) {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this email address already exists.',
+        });
+      }
+      student = findMemoryStudent(cleanId.toLowerCase());
+      if (student?.passwordHash) {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this registration number already exists. Please sign in.',
+        });
+      }
+
+      if (student) {
+        Object.assign(student, profile, { passwordHash });
+        delete student.password;
+      } else {
+        student = { ...profile, passwordHash };
+        memoryStore.students.unshift(student);
       }
     }
 
-    memoryStore.students.unshift(newStudent);
-
     return res.status(201).json({
       success: true,
-      message: 'Student account registered successfully!',
-      user: {
-        role: 'student',
-        ...newStudent,
-      },
+      message: 'Student account registered successfully.',
+      user: publicStudent(student),
     });
   } catch (err) {
     next(err);
   }
 };
 
-// Current Session info
-export const getMe = (req, res) => {
-  const { studentId } = req.query;
-  if (!studentId) {
-    return res.status(400).json({ success: false, message: 'Student ID required' });
+export const getMe = async (req, res, next) => {
+  try {
+    const studentId = typeof req.query.studentId === 'string' ? req.query.studentId.trim() : '';
+    if (!studentId) {
+      return res.status(400).json({ success: false, message: 'Student ID required.' });
+    }
+
+    const student = getDBStatus()
+      ? await Student.findOne({ studentId: exactMatch(studentId) }).select('+passwordHash')
+      : findMemoryStudent(studentId.toLowerCase());
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found.' });
+    }
+
+    return res.json({ success: true, user: publicStudent(student) });
+  } catch (err) {
+    next(err);
   }
-
-  const student = memoryStore.students.find(
-    (s) => s.studentId.toLowerCase() === studentId.trim().toLowerCase()
-  );
-
-  if (!student) {
-    return res.status(404).json({ success: false, message: 'Student not found' });
-  }
-
-  return res.json({
-    success: true,
-    user: {
-      role: 'student',
-      ...student,
-    },
-  });
 };
 
-// Quick list of sample accounts for testing
 export const getDemoAccounts = (req, res) => {
-  const accounts = memoryStore.students.map((s) => ({
-    studentId: s.studentId,
-    name: s.name,
-    department: s.department,
-    currentStatus: s.currentStatus,
-    photo: s.photo,
+  const accounts = memoryStore.students.slice(0, 1004).map((student) => ({
+    studentId: student.studentId,
+    name: student.name,
+    department: student.department,
+    currentStatus: student.currentStatus,
+    photo: student.photo,
   }));
 
-  res.json({
-    success: true,
-    data: accounts,
-    admin: { username: 'admin', defaultPass: 'admin123' },
-  });
+  res.json({ success: true, data: accounts });
 };
-

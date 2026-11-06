@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, ArrowRight, Download, Receipt } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Receipt } from 'lucide-react';
 
 export default function PaymentSuccess({
   paymentData,
@@ -8,9 +8,10 @@ export default function PaymentSuccess({
   onViewReceipt,
 }) {
   const { payment, application } = paymentData || {};
-  const amount = payment?.amount || application?.totalAmount || 110;
-  const transactionId = payment?.transactionId || application?.transactionId || 'TXN202610310001';
-  const applicationId = application?.applicationId || payment?.applicationId || 'IDAPP202610310001';
+  const isDemoPayment = payment?.paymentMode === 'DEMO';
+  const amount = payment?.amount ?? application?.totalAmount ?? 0;
+  const transactionId = payment?.transactionId || application?.transactionId || '—';
+  const applicationId = application?.applicationId || payment?.applicationId || '—';
   const paymentDate = payment?.createdAt
     ? new Date(payment.createdAt).toLocaleString()
     : new Date().toLocaleString();
@@ -47,11 +48,19 @@ export default function PaymentSuccess({
         </div>
 
         <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>
-          ✓ Payment Successful
+          {isDemoPayment ? 'Demo payment completed' : 'Payment Successful'}
         </h2>
         <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-          Your university digital ID fee has been securely verified and booked.
+          {isDemoPayment
+            ? 'This simulated payment moved no money. The demo ID card is now available.'
+            : 'Your university digital ID fee has been securely verified and booked.'}
         </p>
+
+        {isDemoPayment && (
+          <div className="demo-payment-notice" role="note">
+            Demonstration receipt only — not proof of a real bank transaction.
+          </div>
+        )}
 
         <div
           style={{
@@ -64,8 +73,8 @@ export default function PaymentSuccess({
           }}
         >
           <div className="fee-row">
-            <span>Amount Paid:</span>
-            <strong style={{ color: '#16a34a', fontSize: '16px' }}>₹{amount}.00</strong>
+            <span>{isDemoPayment ? 'Demo amount (not paid):' : 'Amount Paid:'}</span>
+            <strong style={{ color: '#16a34a', fontSize: '16px' }}>₹{Number(amount).toFixed(2)}</strong>
           </div>
           <div className="fee-row">
             <span>Transaction ID:</span>

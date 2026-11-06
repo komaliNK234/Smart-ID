@@ -18,7 +18,11 @@ export default function DocumentUpload({
   onDocumentsChange,
 }) {
   // Only ONE document is ever required: Hostel Vacated Form (for status change)
+  const requiresVacatedForm =
+    applicationType === 'Status Change ID' ||
+    (previousStatus === 'College Hostel' && currentStatus !== 'College Hostel');
   const getRequiredDocs = () => {
+    if (!requiresVacatedForm) return [];
     return [
       {
         id: 'Vacated College Hostel Form',
@@ -34,7 +38,7 @@ export default function DocumentUpload({
 
   const reqDocList = getRequiredDocs();
 
-  const handleFileUpload = (docDef, file) => {
+  const handleFileUpload = async (docDef, file) => {
     if (!file) return;
 
     const validExtensions = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
@@ -42,24 +46,37 @@ export default function DocumentUpload({
       alert('Only PDF, JPG, JPEG, and PNG documents are accepted.');
       return;
     }
+    if (file.size > 4 * 1024 * 1024) {
+      alert('File size must be 4 MB or smaller.');
+      return;
+    }
 
-    const fileSizeFormatted =
-      file.size > 1024 * 1024
-        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-        : `${Math.round(file.size / 1024)} KB`;
-
-    const newDoc = {
-      documentType: docDef.id,
-      fileName: file.name,
-      fileSize: fileSizeFormatted,
-      fileType: file.type,
-      status: 'Uploaded',
-      uploadedAt: new Date().toISOString(),
-    };
-
-    const updated = documents.filter((d) => d.documentType !== docDef.id);
-    updated.push(newDoc);
-    onDocumentsChange(updated);
+    try {
+      const fileData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Unable to read the selected file.'));
+        reader.readAsDataURL(file);
+      });
+      const fileSizeFormatted =
+        file.size > 1024 * 1024
+          ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+          : `${Math.max(1, Math.round(file.size / 1024))} KB`;
+      const newDoc = {
+        documentType: docDef.id,
+        fileName: file.name,
+        fileSize: fileSizeFormatted,
+        fileType: file.type,
+        fileData,
+        status: 'Uploaded',
+        uploadedAt: new Date().toISOString(),
+      };
+      const updated = documents.filter((d) => d.documentType !== docDef.id);
+      updated.push(newDoc);
+      onDocumentsChange(updated);
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   const handleAttachDemo = (docDef) => {
@@ -88,11 +105,15 @@ export default function DocumentUpload({
         <FileCheck size={20} color="#2563eb" /> Verification Documents Upload
       </div>
       <div className="panel-subtitle">
-        Upload the signed Hostel Vacated Form (PDF/JPG/PNG). You may also attach a demo receipt for testing.
+        {requiresVacatedForm
+          ? 'Upload the signed Hostel Vacated Form (PDF/JPG/PNG, up to 4 MB). A demo receipt is available for testing.'
+          : 'No clearance documents are required for the selected application.'}
       </div>
 
       <div className="docs-list">
-        {reqDocList.map((docDef) => {
+        {reqDocList.length === 0 ? (
+          <p className="empty-docs-message">Documents will be requested if your application requires clearance.</p>
+        ) : reqDocList.map((docDef) => {
           const uploadedDoc = documents.find((d) => d.documentType === docDef.id);
           const isUploaded = Boolean(uploadedDoc);
 
@@ -167,8 +188,17 @@ function DocUploadItem({ docDef, uploadedDoc, isUploaded, onUpload, onAttachDemo
               }}
             >
               <span className="doc-status-badge doc-status-uploaded">
-                <CheckCircle2 size={13} /> ✓ Uploaded &amp; Verified
+                <CheckCircle2 size={13} /> {uploadedDoc.status || 'Uploaded'}
               </span>
+              {uploadedDoc.fileData && (
+                <a
+                  className="btn btn-outline btn-sm"
+                  href={uploadedDoc.fileData}
+                  download={uploadedDoc.fileName}
+                >
+                  Download file
+                </a>
+              )}
               <span style={{ color: '#475569', fontWeight: 600 }}>
                 {uploadedDoc.fileName} ({uploadedDoc.fileSize})
               </span>

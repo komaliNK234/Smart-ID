@@ -521,7 +521,7 @@ export default function ApplicationWizard({
                       </>
                     ) : (
                       <>
-                        Proceed to Secure Payment (₹{currentTotalFee}) <ArrowRight size={18} />
+                        Proceed to Demo Checkout (₹{currentTotalFee}) <ArrowRight size={18} />
                       </>
                     )}
                   </button>
@@ -607,7 +607,7 @@ export default function ApplicationWizard({
             onClick={onProceedToPayment}
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Processing...' : 'Proceed to Payment (₹100)'}
+            {isSubmitting ? 'Submitting...' : 'Proceed to Demo Checkout (₹100)'}
             <ArrowRight size={16} />
           </button>
         )}
